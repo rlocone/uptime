@@ -1,0 +1,13 @@
+node_modules/
+.next/
+coverage/
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+*.iso
+tsconfig.tsbuildinfo
+.yarn/
+.yarnrc.yml
+yarn.lock

@@ -1,0 +1,56 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  apiKey        String   @unique @default(uuid()) @map("api_key")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastSeen      DateTime @default(now()) @map("last_seen")
+  hosts         Host[]
+
+  @@map("users")
+}
+
+model Host {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  hostname  String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports   Report[]
+
+  @@unique([userId, hostname])
+  @@map("hosts")
+}
+
+model Report {
+  id            String   @id @default(cuid())
+  hostId        String   @map("host_id")
+  uptimeSeconds Int      @map("uptime_seconds")
+  bootTime      Int      @map("boot_time")
+  kernel        String   @default("")
+  lastPatch     String   @default("") @map("last_patch")
+  reportedAt    DateTime @default(now()) @map("reported_at")
+  host          Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([hostId, reportedAt(sort: Desc)])
+  @@map("reports")
+}
+
+model Pageview {
+  id    String @id @default("singleton")
+  count Int    @default(0)
+
+  @@map("pageviews")
+}
