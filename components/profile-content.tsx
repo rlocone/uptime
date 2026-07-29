@@ -162,11 +162,42 @@ export function ProfileContent() {
   if (status === 'unauthenticated') return null
 
   const agentScript = `#!/usr/bin/env python3
-  import requests, time, platform
+  import os
+  import time
+  import platform
+  from pathlib import Path
+
+  import requests
 
   API_URL = "${typeof window !== 'undefined' ? window.location.origin : ''}/api/report"
-  API_KEY = "${profile?.apiKey ?? 'your_api_key_here'}"
   HOSTNAME = platform.node().lower()
+  DEFAULT_KEY_FILES = (
+      Path.home() / ".config" / "uptime-phipi-monitor" / "api-key",
+      Path("/etc/uptime-phipi-monitor/api-key"),
+  )
+
+  def get_api_key():
+      env_key = os.environ.get("UPTIME_API_KEY", "").strip()
+      if env_key:
+          return env_key
+
+      key_file = os.environ.get("UPTIME_API_KEY_FILE", "").strip()
+      if key_file:
+          path = Path(key_file).expanduser()
+          if path.exists():
+              key = path.read_text(encoding="utf-8").strip()
+              if key:
+                  return key
+
+      for path in DEFAULT_KEY_FILES:
+          if path.exists():
+              key = path.read_text(encoding="utf-8").strip()
+              if key:
+                  return key
+
+      raise RuntimeError("Missing UPTIME_API_KEY or key file")
+
+  API_KEY = get_api_key()
 
 def get_uptime():
     with open('/proc/uptime') as f:
@@ -217,7 +248,7 @@ while True:
             <Key className="h-4 w-4" />
             API Key
           </h2>
-          <p className="text-xs text-muted-foreground">Use this key in the X-API-Key header when reporting uptime.</p>
+          <p className="text-xs text-muted-foreground">Use the API key above via UPTIME_API_KEY or a key file. The script below reads both.</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 rounded bg-muted/50 px-3 py-2 text-xs font-mono break-all">
               {showKey ? (profile?.apiKey ?? '') : '•'.repeat(36)}
