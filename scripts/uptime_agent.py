@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import platform
 import time
@@ -47,7 +48,8 @@ def get_boot_time():
 
 API_KEY = get_api_key()
 
-while True:
+
+def report_once():
     data = {
         "hostname": HOSTNAME,
         "uptime_seconds": get_uptime(),
@@ -60,4 +62,20 @@ while True:
         print(f"[{time.strftime('%H:%M:%S')}] {r.status_code} {r.json()}")
     except Exception as e:
         print(f"Error: {e}")
-    time.sleep(300)  # Report every 5 minutes
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Report host uptime to uptime.phipi.io")
+    parser.add_argument("--once", action="store_true", help="send one report then exit")
+    parser.add_argument("--interval", type=int, default=300, help="seconds between reports")
+    args = parser.parse_args()
+
+    while True:
+        report_once()
+        if args.once:
+            break
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    main()

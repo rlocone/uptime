@@ -1,11 +1,8 @@
-'use client'
-
-import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Trophy, Clock, Server, Users, PlusCircle } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
-import Link from 'next/link'
 
-interface LeaderboardEntry {
+export interface LeaderboardEntry {
   rank: number
   name: string
   value: number | string
@@ -21,23 +18,9 @@ const categoryConfig: Record<string, { title: string; icon: any; color: string }
   new_users: { title: 'New Users', icon: PlusCircle, color: '#39ff14' },
 }
 
-export function MiniLeaderboard({ category }: { category: string }) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
+export function MiniLeaderboard({ category, entries }: { category: string; entries: LeaderboardEntry[] }) {
   const config = categoryConfig[category] ?? { title: category, icon: Trophy, color: '#00d4ff' }
   const Icon = config.icon
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/leaderboard?category=${category}&limit=5`)
-        if (res.ok) {
-          const data = await res.json()
-          setEntries(data?.entries ?? [])
-        }
-      } catch (e) { console.error('Leaderboard load error:', e) }
-    }
-    load()
-  }, [category])
 
   return (
     <div className="rounded-lg border neon-border bg-card p-4 space-y-3 hover:border-[rgba(0,212,255,0.5)] transition-all">

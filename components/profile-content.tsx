@@ -16,6 +16,11 @@ interface HostData {
   lastReport: string | null
 }
 
+const formatHostLabel = (hostname: string) => {
+  if (hostname === 'gloria') return 'Gloria'
+  return hostname
+}
+
 interface UserProfile {
   id: string
   username: string
@@ -104,7 +109,7 @@ export function ProfileContent() {
   }
 
   const deleteHost = async (h: HostData) => {
-    if (!window.confirm(`Delete host "${h.hostname}"? This permanently removes it and all its uptime history.`)) return
+    if (!window.confirm(`Delete host "${formatHostLabel(h.hostname)}"? This permanently removes it and all its uptime history.`)) return
     setBusyId(h.id)
     try {
       const res = await fetch(`/api/hosts/${h.id}`, { method: 'DELETE' })
@@ -335,7 +340,7 @@ while True:
                         className="w-full rounded border border-[#00d4ff]/50 bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff]"
                       />
                     ) : (
-                      h?.hostname ?? 'unknown'
+                      formatHostLabel(h?.hostname ?? 'unknown')
                     )}
                   </td>
                   <td className="px-4 py-2.5 neon-text-green text-xs">{formatUptime(h?.currentUptime ?? 0)}</td>

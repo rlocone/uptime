@@ -1,6 +1,3 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Users, Server, Database, Eye, Activity, HardDrive } from 'lucide-react'
 
 interface Stats {
@@ -11,30 +8,13 @@ interface Stats {
   pageviews: number
 }
 
-export function StatsSidebar() {
-  const [stats, setStats] = useState<Stats | null>(null)
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch('/api/stats')
-        if (res.ok) {
-          const data = await res.json()
-          setStats(data)
-        }
-      } catch (e) { console.error('Stats load error:', e) }
-    }
-    load()
-    const interval = setInterval(load, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
+export function StatsSidebar({ stats }: { stats: Stats }) {
   const items = [
-    { label: 'Users Online', value: stats?.usersOnline ?? 0, icon: Activity, color: '#39ff14' },
-    { label: 'Total Users', value: stats?.totalUsers ?? 0, icon: Users, color: '#00d4ff' },
-    { label: 'Total Hosts', value: stats?.totalHosts ?? 0, icon: Server, color: '#00d4ff' },
-    { label: 'Total Reports', value: stats?.totalReports ?? 0, icon: Database, color: '#00d4ff' },
-    { label: 'Page Views', value: stats?.pageviews ?? 0, icon: Eye, color: '#00d4ff' },
+    { label: 'Users Online', value: stats.usersOnline, icon: Activity, color: '#39ff14' },
+    { label: 'Total Users', value: stats.totalUsers, icon: Users, color: '#00d4ff' },
+    { label: 'Total Hosts', value: stats.totalHosts, icon: Server, color: '#00d4ff' },
+    { label: 'Total Reports', value: stats.totalReports, icon: Database, color: '#00d4ff' },
+    { label: 'Page Views', value: stats.pageviews, icon: Eye, color: '#00d4ff' },
   ]
 
   return (
@@ -53,7 +33,7 @@ export function StatsSidebar() {
                 {item.label}
               </span>
               <span className="font-semibold" style={{ color: item.color }}>
-                {item.value?.toLocaleString?.('en-US') ?? '0'}
+                {item.value.toLocaleString('en-US')}
               </span>
             </div>
           )
