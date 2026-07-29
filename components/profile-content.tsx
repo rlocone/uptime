@@ -170,7 +170,7 @@ export function ProfileContent() {
   import requests
 
   API_URL = "${typeof window !== 'undefined' ? window.location.origin : ''}/api/report"
-  HOSTNAME = platform.node().lower()
+  HOSTNAME = os.environ.get("UPTIME_HOSTNAME", platform.node()).strip().lower()
   DEFAULT_KEY_FILES = (
       Path.home() / ".config" / "uptime-phipi-monitor" / "api-key",
       Path("/etc/uptime-phipi-monitor/api-key"),
@@ -399,7 +399,7 @@ while True:
           <Terminal className="h-4 w-4" />
           Agent Script
         </h2>
-        <p className="text-xs text-muted-foreground">Save this script and run it on each host. It reports uptime every 5 minutes.</p>
+        <p className="text-xs text-muted-foreground">Save this script and run it on each host. Set UPTIME_HOSTNAME if you want the host to report under a different label. It reports uptime every 5 minutes.</p>
         <pre className="rounded bg-muted/30 p-4 text-xs overflow-x-auto whitespace-pre text-foreground">
           {agentScript}
         </pre>

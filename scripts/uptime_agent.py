@@ -7,7 +7,7 @@ from pathlib import Path
 import requests
 
 API_URL = "https://uptime.phipi.io/api/report"
-HOSTNAME = platform.node().lower()
+HOSTNAME = os.environ.get("UPTIME_HOSTNAME", platform.node()).strip().lower()
 DEFAULT_KEY_FILES = (
     Path.home() / ".config" / "uptime-phipi-monitor" / "api-key",
     Path("/etc/uptime-phipi-monitor/api-key"),
