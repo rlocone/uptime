@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       },
     })
     if (existing) {
-      return NextResponse.json({ error: 'Username or email already taken' }, { status: 409 })
+      return NextResponse.json({ error: 'User already exists' }, { status: 409 })
     }
     const passwordHash = await bcrypt.hash(password, 12)
     const apiKey = crypto.randomUUID()
@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json({ success: true, username: user.username }, { status: 201 })
   } catch (err: any) {
+    if (err?.code === 'P2002') {
+      return NextResponse.json({ error: 'User already exists' }, { status: 409 })
+    }
     console.error('Signup error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
