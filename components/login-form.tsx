@@ -28,7 +28,7 @@ export function LoginForm() {
         toast.success('Logged in successfully!')
         router.replace('/profile')
       } else {
-        setError('Invalid username/email or password')
+        setError('Check your username/email and password')
       }
     } catch (err: any) {
       setError('Something went wrong')
@@ -43,7 +43,7 @@ export function LoginForm() {
         <div className="text-center">
           <LogIn className="h-8 w-8 text-[#00d4ff] mx-auto mb-2" />
           <h1 className="text-xl font-bold neon-text-blue">Welcome Back</h1>
-          <p className="text-xs text-muted-foreground mt-1">Login to your Uptime Project account</p>
+          <p className="text-xs text-muted-foreground mt-1">Use your username or email address to sign in</p>
         </div>
 
         {error && (
@@ -67,6 +67,9 @@ export function LoginForm() {
                 className="w-full rounded-md border border-border bg-background pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff] focus:border-[#00d4ff]"
               />
             </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground/80">
+              Usernames are case-insensitive. Email addresses are lowercased before lookup.
+            </p>
           </div>
           <div>
             <label className="text-xs text-muted-foreground block mb-1.5">Password</label>

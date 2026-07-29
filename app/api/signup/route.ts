@@ -20,15 +20,21 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { username, email, password } = body ?? {}
+    const normalizedUsername = String(username ?? '').trim()
     const normalizedEmail = String(email ?? '').trim().toLowerCase()
-    if (!username || !normalizedEmail || !password) {
+    if (!normalizedUsername || !normalizedEmail || !password) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
     if (password.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
     }
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ email: normalizedEmail }, { username }] },
+      where: {
+        OR: [
+          { email: normalizedEmail },
+          { username: { equals: normalizedUsername, mode: 'insensitive' } },
+        ],
+      },
     })
     if (existing) {
       return NextResponse.json({ error: 'Username or email already taken' }, { status: 409 })
@@ -36,7 +42,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12)
     const apiKey = crypto.randomUUID()
     const user = await prisma.user.create({
-      data: { username, email: normalizedEmail, passwordHash, apiKey },
+      data: { username: normalizedUsername, email: normalizedEmail, passwordHash, apiKey },
     })
     return NextResponse.json({ success: true, username: user.username }, { status: 201 })
   } catch (err: any) {

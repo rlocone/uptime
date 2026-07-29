@@ -9,8 +9,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { email, password } = body ?? {}
-    const normalizedEmail = String(email ?? '').trim().toLowerCase()
-    if (!normalizedEmail || !password) {
+    const identifier = String(email ?? '').trim()
+    const normalizedEmail = identifier.toLowerCase()
+    if (!identifier || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
@@ -26,7 +27,12 @@ export async function POST(req: NextRequest) {
       )
     }
     const user = await prisma.user.findFirst({
-      where: { OR: [{ email: normalizedEmail }, { username: email }] },
+      where: {
+        OR: [
+          { email: normalizedEmail },
+          { username: { equals: identifier, mode: 'insensitive' } },
+        ],
+      },
     })
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
