@@ -3,18 +3,53 @@ import { SiteFooter } from '@/components/site-footer'
 import { BookOpen, Terminal, Key, Send, Server, Code, FileJson } from 'lucide-react'
 
 const agentScript = `#!/usr/bin/env python3
-import requests, time, platform
+import os
+import platform
+import time
+from pathlib import Path
 
-API_URL = "https://yoursite.com/api/report"
-API_KEY = "your_api_key_here"
+import requests
+
+API_URL = "https://uptime.phipi.io/api/report"
 HOSTNAME = platform.node().lower()
+DEFAULT_KEY_FILES = (
+    Path.home() / ".config" / "abacus-uptime-monitor" / "api-key",
+    Path("/etc/abacus-uptime-reporter/api-key"),
+)
+
+
+def get_api_key():
+    env_key = os.environ.get("UPTIME_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    key_file = os.environ.get("UPTIME_API_KEY_FILE", "").strip()
+    if key_file:
+        path = Path(key_file).expanduser()
+        if path.exists():
+            key = path.read_text(encoding="utf-8").strip()
+            if key:
+                return key
+
+    for path in DEFAULT_KEY_FILES:
+        if path.exists():
+            key = path.read_text(encoding="utf-8").strip()
+            if key:
+                return key
+
+    raise RuntimeError("Missing UPTIME_API_KEY or key file")
+
 
 def get_uptime():
     with open('/proc/uptime') as f:
         return int(float(f.read().split()[0]))
 
+
 def get_boot_time():
     return int(time.time() - get_uptime())
+
+
+API_KEY = get_api_key()
 
 while True:
     data = {
@@ -25,7 +60,7 @@ while True:
         "last_patch": ""
     }
     try:
-        r = requests.post(API_URL, json=data, headers={"X-API-Key": API_KEY})
+        r = requests.post(API_URL, json=data, headers={"X-API-Key": API_KEY}, timeout=30)
         print(f"[{time.strftime('%H:%M:%S')}] {r.status_code} {r.json()}")
     except Exception as e:
         print(f"Error: {e}")
@@ -54,7 +89,7 @@ export default function ApiDocsPage() {
             <div className="space-y-3 text-sm text-muted-foreground">
               <p><span className="text-[#39ff14] font-semibold">1.</span> Register an account and login to get your API key from the Profile page.</p>
               <p><span className="text-[#39ff14] font-semibold">2.</span> Copy the agent script below and save it as <code className="text-foreground bg-muted/50 px-1 rounded">uptime_agent.py</code></p>
-              <p><span className="text-[#39ff14] font-semibold">3.</span> Replace <code className="text-foreground bg-muted/50 px-1 rounded">API_URL</code> and <code className="text-foreground bg-muted/50 px-1 rounded">API_KEY</code> with your values.</p>
+              <p><span className="text-[#39ff14] font-semibold">3.</span> Set <code className="text-foreground bg-muted/50 px-1 rounded">UPTIME_API_KEY</code> in the environment before launching.</p>
               <p><span className="text-[#39ff14] font-semibold">4.</span> Run: <code className="text-foreground bg-muted/50 px-1 rounded">python3 uptime_agent.py</code> (or set up as a systemd service for continuous reporting).</p>
               <p><span className="text-[#39ff14] font-semibold">5.</span> The agent reports every 5 minutes. Adjust the interval as needed.</p>
             </div>

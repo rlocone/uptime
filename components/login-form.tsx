@@ -96,7 +96,7 @@ export function LoginForm() {
         </form>
 
         <p className="text-xs text-center text-muted-foreground">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/register" className="text-[#00d4ff] hover:underline">Register here</Link>
         </p>
       </div>

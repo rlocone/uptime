@@ -28,7 +28,7 @@ export default function AboutPage() {
                 </p>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Whether you are running a homelab, managing production servers, or just curious about
-                  your machine's reliability, Uptime Project gives you a fun way to track and compete.
+                  your machine&apos;s reliability, Uptime Project gives you a fun way to track and compete.
                 </p>
               </div>
 
