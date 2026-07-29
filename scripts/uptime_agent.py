@@ -9,8 +9,8 @@ import requests
 API_URL = "https://uptime.phipi.io/api/report"
 HOSTNAME = platform.node().lower()
 DEFAULT_KEY_FILES = (
-    Path.home() / ".config" / "abacus-uptime-monitor" / "api-key",
-    Path("/etc/abacus-uptime-reporter/api-key"),
+    Path.home() / ".config" / "uptime-phipi-monitor" / "api-key",
+    Path("/etc/uptime-phipi-monitor/api-key"),
 )
 
 
