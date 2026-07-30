@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Save, Users, Check, AlertTriangle, Clock3, TrendingUp, Search, Filter } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
 import { getHostStatus } from '@/lib/team-summary'
+import { TeamHealthBar } from '@/components/team-health-bar'
 
 interface HostSnapshot {
   id: string
@@ -74,6 +75,12 @@ function getSnapshotStatus(host: HostSnapshot) {
   return getHostStatus(toSnapshotReport(host.latestReport), new Date(host.createdAt))
 }
 
+function statusRank(status: ReturnType<typeof getSnapshotStatus>) {
+  if (status === 'down') return 2
+  if (status === 'degraded') return 1
+  return 0
+}
+
 export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) {
   const [team, setTeam] = useState(initialTeam)
   const [selectedHostIds, setSelectedHostIds] = useState<string[]>(initialTeam.memberHostIds ?? [])
@@ -113,6 +120,20 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
     () => filteredHosts.filter((host) => selectedHostIds.includes(host.id)).length,
     [filteredHosts, selectedHostIds]
   )
+
+  const priorityHosts = useMemo(() => {
+    return [...availableHosts]
+      .map((host) => ({ host, status: getSnapshotStatus(host) }))
+      .sort((a, b) => {
+        const rank = statusRank(b.status) - statusRank(a.status)
+        if (rank !== 0) return rank
+        const aTime = a.host.latestReport?.reportedAt ? new Date(a.host.latestReport.reportedAt).getTime() : 0
+        const bTime = b.host.latestReport?.reportedAt ? new Date(b.host.latestReport.reportedAt).getTime() : 0
+        return aTime - bTime
+      })
+      .map((item) => item.host)
+  }, [availableHosts])
+  const attentionHosts = priorityHosts.filter((host) => getSnapshotStatus(host) !== 'up').slice(0, 5)
 
   const saveMembership = async () => {
     if (!hasChanges) return
@@ -240,15 +261,38 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
         </div>
 
         <div className="rounded-lg border neon-border bg-card p-4 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold neon-text-blue flex items-center gap-2">
-              <Check className="h-4 w-4" />
-              Add / Remove Hosts
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              {visibleSelectedCount}/{filteredHosts.length || 0} selected in view
-            </span>
-          </div>
+          <TeamHealthBar
+            counts={{
+              totalHosts: summary?.totalHosts ?? 0,
+              upCount: summary?.upCount ?? 0,
+              degradedCount: summary?.degradedCount ?? 0,
+              downCount: summary?.downCount ?? 0,
+            }}
+          />
+          {attentionHosts.length > 0 ? (
+            <div className="rounded-md border border-amber-400/20 bg-amber-400/5 p-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">Needs attention</p>
+              <div className="space-y-2">
+                {attentionHosts.map((host) => {
+                  const status = getSnapshotStatus(host)
+                  const meta = statusMeta(status)
+                  return (
+                    <div key={host.id} className="flex items-center justify-between gap-3 rounded-md bg-background/40 px-3 py-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{host.hostname}</p>
+                        <p className="text-muted-foreground">
+                          Last report: {host.latestReport?.reportedAt ? new Date(host.latestReport.reportedAt).toLocaleString('en-US', { timeZone: 'UTC' }) : 'Never'}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${meta.bg} ${meta.color}`}>
+                        {meta.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 md:grid-cols-[1fr_180px]">
             <label className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm">

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
+import { TeamHealthBar } from '@/components/team-health-bar'
 
 interface TeamSummary {
   totalHosts: number
@@ -320,18 +321,29 @@ export function TeamsContent() {
                   ) : null}
 
                   {!isEditing ? (
-                    <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-                        <p className="text-[10px] uppercase tracking-[0.2em]">Current uptime total</p>
-                        <p className="mt-1 text-foreground">{formatUptime(summary?.currentUptimeSecondsTotal ?? 0)}</p>
-                      </div>
-                      <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-                        <div className="flex items-center gap-2 text-foreground">
-                          <Clock3 className="h-4 w-4 text-[#00d4ff]" />
-                          Last incident
+                    <div className="space-y-3">
+                      <TeamHealthBar
+                        compact
+                        counts={{
+                          totalHosts: summary?.totalHosts ?? 0,
+                          upCount: summary?.upCount ?? 0,
+                          degradedCount: summary?.degradedCount ?? 0,
+                          downCount: summary?.downCount ?? 0,
+                        }}
+                      />
+                      <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
+                        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                          <p className="text-[10px] uppercase tracking-[0.2em]">Current uptime total</p>
+                          <p className="mt-1 text-foreground">{formatUptime(summary?.currentUptimeSecondsTotal ?? 0)}</p>
                         </div>
-                        <div className="mt-1">
-                          {summary?.lastIncidentAt ? new Date(summary.lastIncidentAt).toLocaleString('en-US', { timeZone: 'UTC' }) : 'None'}
+                        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                          <div className="flex items-center gap-2 text-foreground">
+                            <Clock3 className="h-4 w-4 text-[#00d4ff]" />
+                            Last incident
+                          </div>
+                          <div className="mt-1">
+                            {summary?.lastIncidentAt ? new Date(summary.lastIncidentAt).toLocaleString('en-US', { timeZone: 'UTC' }) : 'None'}
+                          </div>
                         </div>
                       </div>
                     </div>
