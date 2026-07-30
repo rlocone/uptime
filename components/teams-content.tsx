@@ -201,6 +201,8 @@ export function TeamsContent() {
     )
   }
 
+  const stagedHosts = useMemo(() => hosts.filter((host) => appliedHostIds.includes(host.id)), [hosts, appliedHostIds])
+
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -299,6 +301,18 @@ export function TeamsContent() {
                 : 'No hosts staged yet'}
             </span>
           </div>
+          {stagedHosts.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {stagedHosts.map((host) => (
+                <span
+                  key={host.id}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#39ff14]/30 bg-[#39ff14]/10 px-3 py-1 text-xs font-medium text-[#39ff14]"
+                >
+                  {host.hostname}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {loadingHosts ? (
             <p className="text-sm text-muted-foreground">Loading your hosts…</p>
           ) : hosts.length === 0 ? (
