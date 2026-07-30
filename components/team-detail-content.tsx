@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArrowLeft, Save, Users, Check, Minus, AlertTriangle, Clock3, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Save, Users, Check, AlertTriangle, Clock3, TrendingUp, Search, Filter } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
+import { getHostStatus } from '@/lib/team-summary'
 
 interface HostSnapshot {
   id: string
@@ -46,35 +47,75 @@ interface TeamDetail {
   hosts: HostSnapshot[]
 }
 
-function getStatus(latestReport: HostSnapshot['latestReport']) {
-  if (!latestReport?.reportedAt) return 'down'
-  const ageMs = Date.now() - new Date(latestReport.reportedAt).getTime()
-  if (ageMs <= 10 * 60 * 1000) return 'up'
-  if (ageMs <= 60 * 60 * 1000) return 'degraded'
-  return 'down'
-}
+type HostStatusFilter = 'all' | 'up' | 'degraded' | 'down'
 
-function statusMeta(latestReport: HostSnapshot['latestReport']) {
-  const status = getStatus(latestReport)
+function statusMeta(status: Exclude<HostStatusFilter, 'all'>) {
   if (status === 'up') return { label: 'Up', color: 'text-[#39ff14]', bg: 'bg-[#39ff14]/10' }
   if (status === 'degraded') return { label: 'Degraded', color: 'text-amber-400', bg: 'bg-amber-400/10' }
   return { label: 'Down', color: 'text-red-400', bg: 'bg-red-400/10' }
+}
+
+function normalizeIds(ids: string[]) {
+  return Array.from(new Set((ids ?? []).filter(Boolean))).sort().join('|')
+}
+
+function toSnapshotReport(latestReport: HostSnapshot['latestReport']) {
+  return latestReport
+    ? {
+        uptimeSeconds: latestReport.uptimeSeconds,
+        reportedAt: new Date(latestReport.reportedAt),
+        kernel: latestReport.kernel,
+        lastPatch: latestReport.lastPatch,
+      }
+    : null
+}
+
+function getSnapshotStatus(host: HostSnapshot) {
+  return getHostStatus(toSnapshotReport(host.latestReport), new Date(host.createdAt))
 }
 
 export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) {
   const [team, setTeam] = useState(initialTeam)
   const [selectedHostIds, setSelectedHostIds] = useState<string[]>(initialTeam.memberHostIds ?? [])
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<HostStatusFilter>('all')
 
   useEffect(() => {
     setTeam(initialTeam)
     setSelectedHostIds(initialTeam.memberHostIds ?? [])
   }, [initialTeam])
 
-  const availableHosts = team.hosts ?? []
-  const memberHosts = availableHosts.filter((host) => selectedHostIds.includes(host.id))
+  const availableHosts = useMemo(() => team.hosts ?? [], [team.hosts])
+  const selectedKey = useMemo(() => normalizeIds(selectedHostIds), [selectedHostIds])
+  const initialKey = useMemo(() => normalizeIds(initialTeam.memberHostIds ?? []), [initialTeam.memberHostIds])
+  const hasChanges = selectedKey !== initialKey
+
+  const filteredHosts = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return availableHosts.filter((host) => {
+      const status = getSnapshotStatus(host)
+      const matchesStatus = statusFilter === 'all' || status === statusFilter
+      const matchesSearch =
+        !needle ||
+        host.hostname.toLowerCase().includes(needle) ||
+        (host.user?.username ?? '').toLowerCase().includes(needle)
+      return matchesStatus && matchesSearch
+    })
+  }, [availableHosts, search, statusFilter])
+
+  const visibleHostIds = useMemo(() => filteredHosts.map((host) => host.id), [filteredHosts])
+  const memberHosts = useMemo(
+    () => availableHosts.filter((host) => selectedHostIds.includes(host.id)),
+    [availableHosts, selectedHostIds]
+  )
+  const visibleSelectedCount = useMemo(
+    () => filteredHosts.filter((host) => selectedHostIds.includes(host.id)).length,
+    [filteredHosts, selectedHostIds]
+  )
 
   const saveMembership = async () => {
+    if (!hasChanges) return
     setSaving(true)
     try {
       const res = await fetch(`/api/teams/${team.id}`, {
@@ -104,6 +145,14 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
     )
   }
 
+  const selectVisible = () => {
+    setSelectedHostIds((current) => Array.from(new Set([...current, ...visibleHostIds])))
+  }
+
+  const clearVisible = () => {
+    setSelectedHostIds((current) => current.filter((id) => !visibleHostIds.includes(id)))
+  }
+
   const summary = team.summary
 
   return (
@@ -121,20 +170,33 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
           <p className="text-sm text-muted-foreground">/{team.slug}</p>
           {team.description ? <p className="mt-1 text-sm text-muted-foreground">{team.description}</p> : null}
         </div>
-        <button
-          onClick={saveMembership}
-          disabled={saving}
-          className="inline-flex items-center gap-2 rounded-md bg-[#00d4ff] px-4 py-2 text-sm font-semibold text-[#0a0a0f] hover:bg-[#00d4ff]/80 disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? 'Saving…' : 'Save members'}
-        </button>
+        <div className="flex items-end gap-3">
+          <div className="text-right text-xs text-muted-foreground">
+            {hasChanges ? (
+              <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 font-semibold uppercase tracking-[0.2em] text-amber-300">
+                Unsaved changes
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-[#39ff14]/30 bg-[#39ff14]/10 px-2.5 py-1 font-semibold uppercase tracking-[0.2em] text-[#39ff14]">
+                Saved
+              </span>
+            )}
+          </div>
+          <button
+            onClick={saveMembership}
+            disabled={saving || !hasChanges}
+            className="inline-flex items-center gap-2 rounded-md bg-[#00d4ff] px-4 py-2 text-sm font-semibold text-[#0a0a0f] hover:bg-[#00d4ff]/80 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving…' : hasChanges ? 'Save members' : 'No changes'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Metric label="Hosts" value={String(summary?.totalHosts ?? 0)} />
-        <Metric label="Current status" value={`${summary?.upCount ?? 0} up / ${summary?.degradedCount ?? 0} degraded / ${summary?.downCount ?? 0} down`} />
-        <Metric label="24h uptime" value={formatPercent(summary?.uptime24hPercent ?? 0)} />
+        <Metric label="Current state" value={`${summary?.upCount ?? 0} up / ${summary?.degradedCount ?? 0} degraded / ${summary?.downCount ?? 0} down`} />
+        <Metric label="24h coverage" value={formatPercent(summary?.uptime24hPercent ?? 0)} />
         <Metric label="Combined uptime" value={formatUptime(summary?.currentUptimeSecondsTotal ?? 0)} />
       </div>
 
@@ -149,11 +211,12 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
           ) : (
             <div className="space-y-3">
               {memberHosts.map((host) => {
-                const meta = statusMeta(host.latestReport)
+                const status = getSnapshotStatus(host)
+                const meta = statusMeta(status)
                 return (
                   <div key={host.id} className="rounded-md border border-border/60 bg-muted/20 p-3 flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-foreground">{host.hostname}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${meta.bg} ${meta.color}`}>
                           {meta.label}
@@ -177,17 +240,70 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
         </div>
 
         <div className="rounded-lg border neon-border bg-card p-4 space-y-4">
-          <h2 className="text-sm font-semibold neon-text-blue flex items-center gap-2">
-            <Check className="h-4 w-4" />
-            Add / Remove Hosts
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold neon-text-blue flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              Add / Remove Hosts
+            </h2>
+            <span className="text-xs text-muted-foreground">
+              {visibleSelectedCount}/{filteredHosts.length || 0} selected in view
+            </span>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+            <label className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search hosts or owner"
+                className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+              />
+            </label>
+            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as HostStatusFilter)}
+                className="w-full bg-transparent outline-none"
+              >
+                <option value="all">All statuses</option>
+                <option value="up">Up</option>
+                <option value="degraded">Degraded</option>
+                <option value="down">Down</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={selectVisible}
+              disabled={filteredHosts.length === 0}
+              className="rounded-md border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-3 py-1.5 text-xs font-semibold text-[#00d4ff] disabled:opacity-40"
+            >
+              Select visible
+            </button>
+            <button
+              type="button"
+              onClick={clearVisible}
+              disabled={filteredHosts.length === 0}
+              className="rounded-md border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-semibold text-muted-foreground disabled:opacity-40"
+            >
+              Clear visible
+            </button>
+          </div>
+
           {availableHosts.length === 0 ? (
             <p className="text-sm text-muted-foreground">You do not have any hosts yet.</p>
+          ) : filteredHosts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hosts match the current search or status filter.</p>
           ) : (
             <div className="space-y-2 max-h-[640px] overflow-auto pr-1">
-              {availableHosts.map((host: any) => {
+              {filteredHosts.map((host) => {
                 const checked = selectedHostIds.includes(host.id)
-                const meta = statusMeta(host.latestReport)
+                const status = getSnapshotStatus(host)
+                const meta = statusMeta(status)
                 return (
                   <label key={host.id} className="flex items-start gap-3 rounded-md border border-border/60 bg-muted/20 p-3 cursor-pointer hover:border-[#00d4ff]/40 transition-colors">
                     <input
@@ -232,7 +348,8 @@ export function TeamDetailContent({ initialTeam }: { initialTeam: TeamDetail }) 
         </h2>
         <p className="text-sm text-muted-foreground">
           Team totals use the same host-summary logic as the main dashboard: we aggregate the latest report for each host,
-          then classify current state by how recently the last report arrived (up, degraded, or down).
+          then classify current state by how recently the last report arrived (up, degraded, or down). The 24h / 7d / 30d
+          percentages are reporting coverage — the share of hosts that reported within each window.
         </p>
       </div>
     </div>

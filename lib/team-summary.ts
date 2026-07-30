@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db'
 const ACTIVE_WINDOW_MS = 10 * 60 * 1000
 const DEGRADED_WINDOW_MS = 60 * 60 * 1000
 
+export const REPORTING_WINDOW_LABELS = ['24h', '7d', '30d'] as const
+
 export type TeamHostSnapshot = {
   id: string
   hostname: string

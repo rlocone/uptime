@@ -276,9 +276,9 @@ export async function HomeContent() {
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <SummaryMetric label="24h uptime" value={formatPercent(globalSummary.uptime24hPercent)} icon={Clock3} accent="#00d4ff" />
-            <SummaryMetric label="7d uptime" value={formatPercent(globalSummary.uptime7dPercent)} icon={Clock3} accent="#00d4ff" />
-            <SummaryMetric label="30d uptime" value={formatPercent(globalSummary.uptime30dPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="24h coverage" value={formatPercent(globalSummary.uptime24hPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="7d coverage" value={formatPercent(globalSummary.uptime7dPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="30d coverage" value={formatPercent(globalSummary.uptime30dPercent)} icon={Clock3} accent="#00d4ff" />
             <SummaryMetric label="Avg uptime" value={formatUptime(globalSummary.currentUptimeSecondsAverage)} icon={TrendingSummaryIcon} accent="#39ff14" />
           </div>
           <div className="grid grid-cols-3 gap-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs">
@@ -288,6 +288,9 @@ export async function HomeContent() {
           </div>
           <p className="text-xs text-muted-foreground">
             Combined totals use the latest report for each host and classify current state by report recency so the same logic applies everywhere.
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Coverage percentages mean &quot;how many hosts reported inside the window&quot; — they are not duration-based uptime.
           </p>
         </div>
 
@@ -332,16 +335,16 @@ export async function HomeContent() {
                     <p className="mt-1 text-foreground">{team.summary.upCount} up / {team.summary.degradedCount} degraded / {team.summary.downCount} down</p>
                   </div>
                   <div className="rounded-md border border-border/60 bg-muted/20 p-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em]">24h</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em]">24h coverage</p>
                     <p className="mt-1 text-foreground">{formatPercent(team.summary.uptime24hPercent)}</p>
                   </div>
                   <div className="rounded-md border border-border/60 bg-muted/20 p-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em]">7d</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em]">7d coverage</p>
                     <p className="mt-1 text-foreground">{formatPercent(team.summary.uptime7dPercent)}</p>
                   </div>
                   <div className="rounded-md border border-border/60 bg-muted/20 p-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em]">Combined uptime</p>
-                    <p className="mt-1 text-foreground">{formatUptime(team.summary.currentUptimeSecondsTotal)}</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em]">30d coverage</p>
+                    <p className="mt-1 text-foreground">{formatPercent(team.summary.uptime30dPercent)}</p>
                   </div>
                 </div>
               </Link>

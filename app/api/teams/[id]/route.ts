@@ -6,62 +6,14 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
-import { generateUniqueTeamSlug, summarizeHosts } from '@/lib/team-summary'
+import { loadTeam, mapTeam } from '@/lib/team-api'
+import { generateUniqueTeamSlug } from '@/lib/team-summary'
 
 const teamUpdateSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   description: z.string().trim().max(280).nullable().optional(),
   hostIds: z.array(z.string().min(1)).optional(),
 })
-
-async function loadTeam(teamId: string, userId: string) {
-  return prisma.team.findFirst({
-    where: { id: teamId, userId },
-    include: {
-      members: {
-        include: {
-          host: {
-            include: {
-              reports: { orderBy: { reportedAt: 'desc' }, take: 1 },
-              user: { select: { username: true } },
-            },
-          },
-        },
-      },
-    },
-  })
-}
-
-function mapTeam(team: any) {
-  const hosts = (team?.members ?? []).map((member: any) => ({
-    id: member?.host?.id,
-    hostname: member?.host?.hostname,
-    createdAt: member?.host?.createdAt,
-    userId: member?.host?.userId,
-    user: member?.host?.user ? { username: member.host.user.username } : undefined,
-    latestReport: member?.host?.reports?.[0]
-      ? {
-          uptimeSeconds: member.host.reports[0].uptimeSeconds,
-          reportedAt: member.host.reports[0].reportedAt,
-          kernel: member.host.reports[0].kernel,
-          lastPatch: member.host.reports[0].lastPatch,
-        }
-      : null,
-  }))
-
-  return {
-    id: team.id,
-    name: team.name,
-    description: team.description,
-    slug: team.slug,
-    createdAt: team.createdAt,
-    updatedAt: team.updatedAt,
-    memberCount: team.members?.length ?? 0,
-    memberHostIds: (team.members ?? []).map((member: any) => member.hostId),
-    summary: summarizeHosts(hosts),
-    hosts,
-  }
-}
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   try {

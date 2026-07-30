@@ -197,6 +197,14 @@ export default function ApiDocsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Updates a team and replaces its host membership set.</p>
               </div>
               <div className="rounded bg-muted/30 p-3">
+                <p className="text-foreground font-semibold">POST /api/teams/[id]/members</p>
+                <p className="text-xs text-muted-foreground mt-1">Adds one or more hosts to a team without replacing the rest.</p>
+              </div>
+              <div className="rounded bg-muted/30 p-3">
+                <p className="text-foreground font-semibold">DELETE /api/teams/[id]/members</p>
+                <p className="text-xs text-muted-foreground mt-1">Removes one or more hosts from a team without disturbing other members.</p>
+              </div>
+              <div className="rounded bg-muted/30 p-3">
                 <p className="text-foreground font-semibold">GET /api/leaderboard?category=hosts_current&limit=25&page=1</p>
                 <p className="text-xs text-muted-foreground mt-1">Returns leaderboard entries. Categories: hosts_current, hosts_record, users_current, users_record, teams_current, teams_record, new_hosts, new_users.</p>
               </div>

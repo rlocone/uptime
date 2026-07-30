@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
 
 interface TeamSummary {
@@ -168,7 +168,10 @@ export function TeamsContent() {
           <span className="neon-text-blue">Teams</span>
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Group hosts into shared views and track combined uptime totals per team.
+          Group hosts into shared views and track combined totals per team.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The 24h / 7d / 30d values below are reporting coverage, not literal downtime.
         </p>
       </div>
 
@@ -307,22 +310,20 @@ export function TeamsContent() {
                   </div>
 
                   {!isEditing ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                       <Metric label="Hosts" value={String(summary?.totalHosts ?? 0)} />
                       <Metric label="Up / Degraded / Down" value={`${summary?.upCount ?? 0} / ${summary?.degradedCount ?? 0} / ${summary?.downCount ?? 0}`} />
-                      <Metric label="24h" value={formatPercent(summary?.uptime24hPercent ?? 0)} />
-                      <Metric label="7d" value={formatPercent(summary?.uptime7dPercent ?? 0)} />
+                      <Metric label="24h coverage" value={formatPercent(summary?.uptime24hPercent ?? 0)} />
+                      <Metric label="7d coverage" value={formatPercent(summary?.uptime7dPercent ?? 0)} />
+                      <Metric label="30d coverage" value={formatPercent(summary?.uptime30dPercent ?? 0)} />
                     </div>
                   ) : null}
 
                   {!isEditing ? (
                     <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
                       <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-                        <div className="flex items-center gap-2 text-foreground">
-                          <TrendingUp className="h-4 w-4 text-[#39ff14]" />
-                          Combined uptime
-                        </div>
-                        <div className="mt-1 font-mono">{formatUptime(summary?.currentUptimeSecondsTotal ?? 0)}</div>
+                        <p className="text-[10px] uppercase tracking-[0.2em]">Current uptime total</p>
+                        <p className="mt-1 text-foreground">{formatUptime(summary?.currentUptimeSecondsTotal ?? 0)}</p>
                       </div>
                       <div className="rounded-md border border-border/60 bg-muted/20 p-3">
                         <div className="flex items-center gap-2 text-foreground">
