@@ -10,6 +10,8 @@ const tabs = [
   { key: 'hosts_record', label: 'Hosts: Record', icon: Trophy },
   { key: 'users_current', label: 'Users: Current', icon: Users },
   { key: 'users_record', label: 'Users: Record', icon: Trophy },
+  { key: 'teams_current', label: 'Teams: Current', icon: Users },
+  { key: 'teams_record', label: 'Teams: Record', icon: Trophy },
   { key: 'new_hosts', label: 'New Hosts', icon: Server },
   { key: 'new_users', label: 'New Users', icon: PlusCircle },
 ]

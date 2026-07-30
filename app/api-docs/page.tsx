@@ -189,8 +189,16 @@ export default function ApiDocsPage() {
                 <p className="text-xs text-muted-foreground mt-1">Returns project stats (users online, total users, hosts, reports, pageviews). No auth required.</p>
               </div>
               <div className="rounded bg-muted/30 p-3">
+                <p className="text-foreground font-semibold">GET /api/teams</p>
+                <p className="text-xs text-muted-foreground mt-1">Returns your teams plus combined totals and current-state summaries. Requires login.</p>
+              </div>
+              <div className="rounded bg-muted/30 p-3">
+                <p className="text-foreground font-semibold">PATCH /api/teams/[id]</p>
+                <p className="text-xs text-muted-foreground mt-1">Updates a team and replaces its host membership set.</p>
+              </div>
+              <div className="rounded bg-muted/30 p-3">
                 <p className="text-foreground font-semibold">GET /api/leaderboard?category=hosts_current&limit=25&page=1</p>
-                <p className="text-xs text-muted-foreground mt-1">Returns leaderboard entries. Categories: hosts_current, hosts_record, users_current, users_record, new_hosts, new_users.</p>
+                <p className="text-xs text-muted-foreground mt-1">Returns leaderboard entries. Categories: hosts_current, hosts_record, users_current, users_record, teams_current, teams_record, new_hosts, new_users.</p>
               </div>
               <div className="rounded bg-muted/30 p-3">
                 <p className="text-foreground font-semibold">GET /api/sig/[username]</p>

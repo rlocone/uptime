@@ -1,0 +1,355 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { toast } from 'sonner'
+import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react'
+import { formatUptime } from '@/lib/uptime'
+
+interface TeamSummary {
+  totalHosts: number
+  uptime24hPercent: number
+  uptime7dPercent: number
+  uptime30dPercent: number
+  currentUptimeSecondsTotal: number
+  currentUptimeSecondsAverage: number
+  upCount: number
+  degradedCount: number
+  downCount: number
+  lastIncidentAt: string | null
+}
+
+interface TeamListItem {
+  id: string
+  name: string
+  description: string | null
+  slug: string
+  createdAt: string
+  updatedAt: string
+  memberCount: number
+  summary: TeamSummary
+}
+
+function formatPercent(value: number) {
+  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`
+}
+
+export function TeamsContent() {
+  const [teams, setTeams] = useState<TeamListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [editingDescription, setEditingDescription] = useState('')
+
+  const loadTeams = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/teams')
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setTeams(data?.teams ?? [])
+      } else {
+        toast.error(data?.error ?? 'Failed to load teams')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to load teams')
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadTeams()
+  }, [])
+
+  const startEdit = (team: TeamListItem) => {
+    setEditingId(team.id)
+    setEditingName(team.name)
+    setEditingDescription(team.description ?? '')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditingName('')
+    setEditingDescription('')
+  }
+
+  const createTeam = async () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) return
+    setCreating(true)
+    try {
+      const res = await fetch('/api/teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName, description: description.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Team created')
+        setName('')
+        setDescription('')
+        await loadTeams()
+      } else {
+        toast.error(data?.error ?? 'Failed to create team')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to create team')
+    }
+    setCreating(false)
+  }
+
+  const saveTeam = async (team: TeamListItem) => {
+    const trimmedName = editingName.trim()
+    if (!trimmedName) return
+    setBusyId(team.id)
+    try {
+      const res = await fetch(`/api/teams/${team.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName, description: editingDescription.trim() || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Team updated')
+        const next = data?.team ?? team
+        setTeams((current) => current.map((item) => (item.id === team.id ? next : item)))
+        cancelEdit()
+      } else {
+        toast.error(data?.error ?? 'Failed to update team')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to update team')
+    }
+    setBusyId(null)
+  }
+
+  const deleteTeam = async (team: TeamListItem) => {
+    if (!window.confirm(`Delete team "${team.name}"? This removes the team and its member assignments.`)) return
+    setBusyId(team.id)
+    try {
+      const res = await fetch(`/api/teams/${team.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        toast.success('Team deleted')
+        setTeams((current) => current.filter((item) => item.id !== team.id))
+      } else {
+        toast.error(data?.error ?? 'Failed to delete team')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to delete team')
+    }
+    setBusyId(null)
+  }
+
+  const combinedTotals = useMemo(() => {
+    return teams.reduce(
+      (acc, team) => {
+        acc.hosts += team.summary?.totalHosts ?? 0
+        acc.memberships += team.memberCount ?? 0
+        return acc
+      },
+      { hosts: 0, memberships: 0 }
+    )
+  }, [teams])
+
+  return (
+    <div className="mx-auto max-w-[1200px] px-4 py-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+          <Users className="h-6 w-6 text-[#00d4ff]" />
+          <span className="neon-text-blue">Teams</span>
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Group hosts into shared views and track combined uptime totals per team.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-lg border neon-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Teams</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{teams.length}</p>
+        </div>
+        <div className="rounded-lg border neon-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Team hosts</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{combinedTotals.hosts}</p>
+        </div>
+        <div className="rounded-lg border neon-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Memberships</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{combinedTotals.memberships}</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border neon-border bg-card p-4 space-y-3">
+        <h2 className="text-sm font-semibold neon-text-green flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Create Team
+        </h2>
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && createTeam()}
+            placeholder="Team name"
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff]"
+          />
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && createTeam()}
+            placeholder="Optional description"
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff]"
+          />
+          <button
+            onClick={createTeam}
+            disabled={creating}
+            className="rounded-md bg-[#00d4ff] px-4 py-2 text-sm font-semibold text-[#0a0a0f] hover:bg-[#00d4ff]/80 disabled:opacity-50"
+          >
+            {creating ? 'Creating…' : 'Create'}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold neon-text-blue">Your Teams</h2>
+          <span className="text-xs text-muted-foreground">{loading ? 'Loading…' : `${teams.length} team${teams.length === 1 ? '' : 's'}`}</span>
+        </div>
+
+        {loading ? (
+          <div className="rounded-lg border neon-border bg-card p-6 text-sm text-muted-foreground">Loading teams…</div>
+        ) : teams.length === 0 ? (
+          <div className="rounded-lg border neon-border bg-card p-6 text-sm text-muted-foreground">
+            No teams yet. Create one above to start grouping hosts.
+          </div>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {teams.map((team) => {
+              const summary = team.summary
+              const isEditing = editingId === team.id
+              return (
+                <div key={team.id} className="rounded-lg border neon-border bg-card p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="w-full rounded-md border border-[#00d4ff]/40 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff]"
+                          />
+                          <textarea
+                            value={editingDescription}
+                            onChange={(e) => setEditingDescription(e.target.value)}
+                            rows={2}
+                            className="w-full rounded-md border border-[#00d4ff]/40 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#00d4ff]"
+                            placeholder="Optional description"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <Link href={`/teams/${team.slug}`} className="text-base font-semibold text-foreground hover:text-[#00d4ff] transition-colors">
+                            {team.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">/{team.slug}</p>
+                          {team.description ? <p className="mt-1 text-sm text-muted-foreground">{team.description}</p> : null}
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => saveTeam(team)}
+                            disabled={busyId === team.id}
+                            className="rounded p-2 text-[#39ff14] hover:bg-[#39ff14]/10 disabled:opacity-40"
+                            title="Save"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={busyId === team.id}
+                            className="rounded p-2 text-muted-foreground hover:bg-muted/50 disabled:opacity-40"
+                            title="Cancel"
+                          >
+                            ×
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(team)}
+                            disabled={busyId === team.id}
+                            className="rounded p-2 text-[#00d4ff] hover:bg-[#00d4ff]/10 disabled:opacity-40"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteTeam(team)}
+                            disabled={busyId === team.id}
+                            className="rounded p-2 text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isEditing ? (
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <Metric label="Hosts" value={String(summary?.totalHosts ?? 0)} />
+                      <Metric label="Up / Degraded / Down" value={`${summary?.upCount ?? 0} / ${summary?.degradedCount ?? 0} / ${summary?.downCount ?? 0}`} />
+                      <Metric label="24h" value={formatPercent(summary?.uptime24hPercent ?? 0)} />
+                      <Metric label="7d" value={formatPercent(summary?.uptime7dPercent ?? 0)} />
+                    </div>
+                  ) : null}
+
+                  {!isEditing ? (
+                    <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                        <div className="flex items-center gap-2 text-foreground">
+                          <TrendingUp className="h-4 w-4 text-[#39ff14]" />
+                          Combined uptime
+                        </div>
+                        <div className="mt-1 font-mono">{formatUptime(summary?.currentUptimeSecondsTotal ?? 0)}</div>
+                      </div>
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                        <div className="flex items-center gap-2 text-foreground">
+                          <Clock3 className="h-4 w-4 text-[#00d4ff]" />
+                          Last incident
+                        </div>
+                        <div className="mt-1">
+                          {summary?.lastIncidentAt ? new Date(summary.lastIncidentAt).toLocaleString('en-US', { timeZone: 'UTC' }) : 'None'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  )
+}

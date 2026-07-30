@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
       'hosts_record',
       'users_current',
       'users_record',
+      'teams_current',
+      'teams_record',
       'new_hosts',
       'new_users',
     ])
@@ -103,6 +105,54 @@ export async function GET(req: NextRequest) {
       entries = (results ?? []).map((r: any, i: number) => ({
         rank: skip + i + 1,
         name: r?.username ?? 'unknown',
+        value: Number(r?.total_record ?? 0),
+        isUptime: true,
+      }))
+    } else if (category === 'teams_current') {
+      const results: any[] = await prisma.$queryRaw`
+        SELECT t.name, u.username, COALESCE(SUM(latest.uptime_seconds), 0)::bigint as total_uptime
+        FROM teams t
+        JOIN users u ON t.user_id = u.id
+        LEFT JOIN team_members tm ON tm.team_id = t.id
+        LEFT JOIN LATERAL (
+          SELECT uptime_seconds
+          FROM reports
+          WHERE host_id = tm.host_id
+          ORDER BY reported_at DESC
+          LIMIT 1
+        ) latest ON true
+        GROUP BY t.id, t.name, u.username
+        ORDER BY total_uptime DESC, t.name ASC
+        LIMIT ${limit} OFFSET ${skip}
+      `
+      const countRes: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as c FROM teams`
+      total = countRes?.[0]?.c ?? 0
+      entries = (results ?? []).map((r: any, i: number) => ({
+        rank: skip + i + 1,
+        name: `${r?.name ?? 'unknown'} (${r?.username ?? 'unknown'})`,
+        value: Number(r?.total_uptime ?? 0),
+        isUptime: true,
+      }))
+    } else if (category === 'teams_record') {
+      const results: any[] = await prisma.$queryRaw`
+        SELECT t.name, u.username, COALESCE(SUM(max_up.max_uptime), 0)::bigint as total_record
+        FROM teams t
+        JOIN users u ON t.user_id = u.id
+        LEFT JOIN team_members tm ON tm.team_id = t.id
+        LEFT JOIN LATERAL (
+          SELECT MAX(r.uptime_seconds) as max_uptime
+          FROM reports r
+          WHERE r.host_id = tm.host_id
+        ) max_up ON true
+        GROUP BY t.id, t.name, u.username
+        ORDER BY total_record DESC, t.name ASC
+        LIMIT ${limit} OFFSET ${skip}
+      `
+      const countRes: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as c FROM teams`
+      total = countRes?.[0]?.c ?? 0
+      entries = (results ?? []).map((r: any, i: number) => ({
+        rank: skip + i + 1,
+        name: `${r?.name ?? 'unknown'} (${r?.username ?? 'unknown'})`,
         value: Number(r?.total_record ?? 0),
         isUptime: true,
       }))

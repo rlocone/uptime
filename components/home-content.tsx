@@ -1,13 +1,102 @@
+import Image from 'next/image'
+import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db'
+import { authOptions } from '@/lib/auth-options'
+import { summarizeHosts } from '@/lib/team-summary'
+import { formatUptime } from '@/lib/uptime'
 import { StatsSidebar } from '@/components/stats-sidebar'
 import { MiniLeaderboard, type LeaderboardEntry } from '@/components/mini-leaderboard'
-import { Server, Zap } from 'lucide-react'
+import { Clock3, Server, ShieldAlert, ShieldCheck, ShieldX, Users, Zap } from 'lucide-react'
 
 const categories = [
   'hosts_current', 'hosts_record',
   'users_current', 'users_record',
   'new_hosts', 'new_users',
 ] as const
+
+type DashboardTeam = {
+  id: string
+  name: string
+  description: string | null
+  slug: string
+  summary: ReturnType<typeof summarizeHosts>
+}
+
+function formatPercent(value: number) {
+  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`
+}
+
+async function getGlobalSummary() {
+  const hosts = await prisma.host.findMany({
+    include: {
+      reports: { orderBy: { reportedAt: 'desc' }, take: 1 },
+      user: { select: { username: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return summarizeHosts(
+    hosts.map((host: any) => ({
+      id: host.id,
+      hostname: host.hostname,
+      createdAt: host.createdAt,
+      userId: host.userId,
+      user: host.user ? { username: host.user.username } : undefined,
+      latestReport: host.reports?.[0]
+        ? {
+            uptimeSeconds: host.reports[0].uptimeSeconds,
+            reportedAt: host.reports[0].reportedAt,
+            kernel: host.reports[0].kernel,
+            lastPatch: host.reports[0].lastPatch,
+          }
+        : null,
+    }))
+  )
+}
+
+async function getUserTeams(userId: string): Promise<DashboardTeam[]> {
+  const teams = await prisma.team.findMany({
+    where: { userId },
+    include: {
+      members: {
+        include: {
+          host: {
+            include: {
+              reports: { orderBy: { reportedAt: 'desc' }, take: 1 },
+              user: { select: { username: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return teams.map((team: any) => ({
+    id: team.id,
+    name: team.name,
+    description: team.description,
+    slug: team.slug,
+    summary: summarizeHosts(
+      (team.members ?? []).map((member: any) => ({
+        id: member.host.id,
+        hostname: member.host.hostname,
+        createdAt: member.host.createdAt,
+        userId: member.host.userId,
+        user: member.host.user ? { username: member.host.user.username } : undefined,
+        latestReport: member.host.reports?.[0]
+          ? {
+              uptimeSeconds: member.host.reports[0].uptimeSeconds,
+              reportedAt: member.host.reports[0].reportedAt,
+              kernel: member.host.reports[0].kernel,
+              lastPatch: member.host.reports[0].lastPatch,
+            }
+          : null,
+      }))
+    ),
+  }))
+}
 
 interface Stats {
   usersOnline: number
@@ -146,7 +235,13 @@ async function getLeaderboardEntries(category: (typeof categories)[number]): Pro
 }
 
 export async function HomeContent() {
-  const stats = await getStats()
+  const [stats, globalSummary, session] = await Promise.all([
+    getStats(),
+    getGlobalSummary(),
+    getServerSession(authOptions),
+  ])
+  const userId = (session?.user as any)?.id
+  const userTeams = userId ? await getUserTeams(userId) : []
   const leaderboardEntries: Record<string, LeaderboardEntry[]> = {}
 
   for (const category of categories) {
@@ -169,6 +264,96 @@ export async function HomeContent() {
         </p>
       </div>
 
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-lg border neon-border bg-card p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold neon-text-blue flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Combined Total — All Hosts
+            </h2>
+            <span className="rounded-full border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#00d4ff]">
+              {globalSummary.totalHosts} hosts
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <SummaryMetric label="24h uptime" value={formatPercent(globalSummary.uptime24hPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="7d uptime" value={formatPercent(globalSummary.uptime7dPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="30d uptime" value={formatPercent(globalSummary.uptime30dPercent)} icon={Clock3} accent="#00d4ff" />
+            <SummaryMetric label="Avg uptime" value={formatUptime(globalSummary.currentUptimeSecondsAverage)} icon={TrendingSummaryIcon} accent="#39ff14" />
+          </div>
+          <div className="grid grid-cols-3 gap-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs">
+            <StateChip label="Up" value={globalSummary.upCount} icon={ShieldCheck} color="#39ff14" />
+            <StateChip label="Degraded" value={globalSummary.degradedCount} icon={ShieldAlert} color="#f59e0b" />
+            <StateChip label="Down" value={globalSummary.downCount} icon={ShieldX} color="#f87171" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Combined totals use the latest report for each host and classify current state by report recency so the same logic applies everywhere.
+          </p>
+        </div>
+
+        <div className="rounded-lg border neon-border bg-card p-4 space-y-4">
+          <h2 className="text-sm font-semibold neon-text-green flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Aggregation Logic
+          </h2>
+          <p className="text-xs text-muted-foreground">Overall totals cover every host on the site.</p>
+          <p className="text-xs text-muted-foreground">Team cards reuse the same summary math but only for the hosts assigned to that team.</p>
+          <p className="text-xs text-muted-foreground">Current state is inferred from the most recent report timestamp: up, degraded, or down.</p>
+        </div>
+      </div>
+
+      {userTeams.length > 0 ? (
+        <div className="mb-6 rounded-lg border neon-border bg-card p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold neon-text-blue flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Your Teams
+            </h2>
+            <Link href="/teams" className="text-xs text-[#00d4ff] hover:underline">
+              Manage teams
+            </Link>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {userTeams.map((team) => (
+              <Link key={team.id} href={`/teams/${team.slug}`} className="rounded-lg border border-border/60 bg-background/60 p-4 transition-colors hover:border-[#00d4ff]/40 hover:bg-muted/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">{team.name}</h3>
+                    <p className="text-[11px] text-muted-foreground">/{team.slug}</p>
+                    {team.description ? <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{team.description}</p> : null}
+                  </div>
+                  <span className="rounded-full border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#00d4ff]">
+                    {team.summary.totalHosts} hosts
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em]">Status</p>
+                    <p className="mt-1 text-foreground">{team.summary.upCount} up / {team.summary.degradedCount} degraded / {team.summary.downCount} down</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em]">24h</p>
+                    <p className="mt-1 text-foreground">{formatPercent(team.summary.uptime24hPercent)}</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em]">7d</p>
+                    <p className="mt-1 text-foreground">{formatPercent(team.summary.uptime7dPercent)}</p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-2">
+                    <p className="text-[10px] uppercase tracking-[0.2em]">Combined uptime</p>
+                    <p className="mt-1 text-foreground">{formatUptime(team.summary.currentUptimeSecondsTotal)}</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : session?.user ? (
+        <div className="mb-6 rounded-lg border neon-border bg-card p-4 text-sm text-muted-foreground">
+          You do not have any teams yet. Create one in the Teams section to group hosts and track combined totals.
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
         <aside className="space-y-4">
           <StatsSidebar stats={stats} />
@@ -182,6 +367,33 @@ export async function HomeContent() {
             <p>3. Run the agent script on your servers</p>
             <p>4. Watch your uptime climb the leaderboards</p>
           </div>
+
+          <div className="rounded-lg border neon-border bg-card p-4 space-y-3 overflow-hidden">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-5 items-center rounded-full border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#00d4ff]">
+                SIG
+              </span>
+              <h3 className="text-sm font-semibold neon-text-blue">Port0 Badge</h3>
+            </div>
+            <a
+              href="/api/sig/eXa"
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-md focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/40 focus:ring-offset-2 focus:ring-offset-background"
+            >
+              <Image
+                src="/port0-badge.svg"
+                alt="Uptime Project signature badge for eXa"
+                width={400}
+                height={80}
+                unoptimized
+                className="h-auto w-full rounded-md border border-[#00d4ff]/20 bg-[#0a0a1a]"
+              />
+            </a>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              A subtle, high-contrast signature badge for Port0 that stays visible without crowding the leaderboard.
+            </p>
+          </div>
         </aside>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -192,4 +404,32 @@ export async function HomeContent() {
       </div>
     </div>
   )
+}
+
+function SummaryMetric({ label, value, icon: Icon, accent }: { label: string; value: string; icon: any; accent: string }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+        <Icon className="h-3.5 w-3.5" style={{ color: accent }} />
+      </div>
+      <p className="mt-1 text-sm font-semibold text-foreground" style={{ color: accent }}>{value}</p>
+    </div>
+  )
+}
+
+function StateChip({ label, value, icon: Icon, color }: { label: string; value: number; icon: any; color: string }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-background/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+        <Icon className="h-3.5 w-3.5" style={{ color }} />
+      </div>
+      <p className="mt-1 text-lg font-semibold" style={{ color }}>{value}</p>
+    </div>
+  )
+}
+
+function TrendingSummaryIcon(props: any) {
+  return <Clock3 {...props} />
 }

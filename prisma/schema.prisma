@@ -18,20 +18,51 @@ model User {
   createdAt     DateTime @default(now()) @map("created_at")
   lastSeen      DateTime @default(now()) @map("last_seen")
   hosts         Host[]
+  teams         Team[]
 
   @@map("users")
 }
 
 model Host {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  hostname  String
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reports   Report[]
+  id              String        @id @default(cuid())
+  userId          String        @map("user_id")
+  hostname        String
+  createdAt       DateTime      @default(now()) @map("created_at")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports         Report[]
+  teamMemberships TeamMember[]
 
   @@unique([userId, hostname])
   @@map("hosts")
+}
+
+model Team {
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  name        String
+  description String?
+  slug        String
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  owner       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+
+  @@unique([userId, name])
+  @@unique([userId, slug])
+  @@index([userId, slug])
+  @@map("teams")
+}
+
+model TeamMember {
+  teamId   String   @map("team_id")
+  hostId   String   @map("host_id")
+  addedAt  DateTime @default(now()) @map("added_at")
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  host     Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, hostId])
+  @@index([hostId])
+  @@map("team_members")
 }
 
 model Report {

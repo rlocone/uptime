@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
-import { Server, BarChart3, Info, UserPlus, LogIn, User, BookOpen, LogOut, Menu, X } from 'lucide-react'
+import { Server, BarChart3, Info, UserPlus, LogIn, User, BookOpen, LogOut, Menu, X, Users } from 'lucide-react'
 import { useState } from 'react'
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Server },
   { href: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
+  { href: '/teams', label: 'Teams', icon: Users },
   { href: '/about', label: 'About', icon: Info },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
 ]
