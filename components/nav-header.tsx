@@ -19,6 +19,11 @@ export function NavHeader() {
   const { data: session, status } = useSession() || {}
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const signOutToCurrentOrigin = () => {
+    const callbackUrl = typeof window !== 'undefined' ? window.location.origin : '/'
+    return signOut({ callbackUrl })
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-3">
@@ -53,7 +58,7 @@ export function NavHeader() {
                 <User className="h-4 w-4" />
                 {session?.user?.name ?? 'Profile'}
               </Link>
-              <button onClick={() => signOut({ callbackUrl: '/' })} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all">
+              <button onClick={signOutToCurrentOrigin} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all">
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
@@ -96,7 +101,7 @@ export function NavHeader() {
                 <User className="h-4 w-4" />
                 Profile
               </Link>
-              <button onClick={() => { setMobileOpen(false); signOut({ callbackUrl: '/' }) }} className="flex items-center gap-2 px-3 py-2 rounded text-sm text-muted-foreground hover:text-destructive w-full text-left">
+              <button onClick={() => { setMobileOpen(false); signOutToCurrentOrigin() }} className="flex items-center gap-2 px-3 py-2 rounded text-sm text-muted-foreground hover:text-destructive w-full text-left">
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
