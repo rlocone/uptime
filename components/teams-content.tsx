@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, Clock3, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { formatUptime } from '@/lib/uptime'
 import { TeamHealthBar } from '@/components/team-health-bar'
 
@@ -18,6 +18,13 @@ interface TeamSummary {
   degradedCount: number
   downCount: number
   lastIncidentAt: string | null
+}
+
+interface HostItem {
+  id: string
+  hostname: string
+  currentUptime: number
+  lastReport: string | null
 }
 
 interface TeamListItem {
@@ -37,11 +44,14 @@ function formatPercent(value: number) {
 
 export function TeamsContent() {
   const [teams, setTeams] = useState<TeamListItem[]>([])
+  const [hosts, setHosts] = useState<HostItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingHosts, setLoadingHosts] = useState(true)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [selectedHostIds, setSelectedHostIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [editingDescription, setEditingDescription] = useState('')
@@ -63,8 +73,23 @@ export function TeamsContent() {
     setLoading(false)
   }
 
+  const loadHosts = async () => {
+    setLoadingHosts(true)
+    try {
+      const res = await fetch('/api/hosts')
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setHosts(data?.hosts ?? [])
+      }
+    } catch (error) {
+      console.error(error)
+    }
+    setLoadingHosts(false)
+  }
+
   useEffect(() => {
     loadTeams()
+    loadHosts()
   }, [])
 
   const startEdit = (team: TeamListItem) => {
@@ -87,13 +112,14 @@ export function TeamsContent() {
       const res = await fetch('/api/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName, description: description.trim() }),
+        body: JSON.stringify({ name: trimmedName, description: description.trim(), hostIds: selectedHostIds }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         toast.success('Team created')
         setName('')
         setDescription('')
+        setSelectedHostIds([])
         await loadTeams()
       } else {
         toast.error(data?.error ?? 'Failed to create team')
@@ -163,17 +189,23 @@ export function TeamsContent() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-          <Users className="h-6 w-6 text-[#00d4ff]" />
-          <span className="neon-text-blue">Teams</span>
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Group hosts into shared views and track combined totals per team.
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          The 24h / 7d / 30d values below are reporting coverage, not literal downtime.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to dashboard
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight flex items-center gap-3">
+            <Users className="h-6 w-6 text-[#00d4ff]" />
+            <span className="neon-text-blue">Teams</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Group hosts into shared views and track combined totals per team.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The 24h / 7d / 30d values below are reporting coverage, not literal downtime.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -218,6 +250,46 @@ export function TeamsContent() {
           >
             {creating ? 'Creating…' : 'Create'}
           </button>
+        </div>
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-foreground">Add hosts now</p>
+            <span className="text-xs text-muted-foreground">{selectedHostIds.length} selected</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Select any of your hosts to assign them as soon as the team is created. You can change membership later from the team detail page.
+          </p>
+          {loadingHosts ? (
+            <p className="text-sm text-muted-foreground">Loading your hosts…</p>
+          ) : hosts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">You do not have any hosts yet. Add a host first, then come back here to group it.</p>
+          ) : (
+            <div className="max-h-56 overflow-auto rounded-md border border-border/60 bg-background/60 p-2 space-y-2">
+              {hosts.map((host) => {
+                const checked = selectedHostIds.includes(host.id)
+                return (
+                  <label key={host.id} className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedHostIds((current) =>
+                          current.includes(host.id) ? current.filter((id) => id !== host.id) : [...current, host.id]
+                        )
+                      }
+                      className="h-4 w-4 rounded border-border text-[#00d4ff] focus:ring-[#00d4ff]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{host.hostname}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Current uptime: {formatUptime(host.currentUptime ?? 0)} • Last report: {host.lastReport ? new Date(host.lastReport).toLocaleString('en-US', { timeZone: 'UTC' }) : 'Never'}
+                      </p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 

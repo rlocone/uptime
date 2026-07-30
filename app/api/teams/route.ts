@@ -10,6 +10,7 @@ import { generateUniqueTeamSlug, summarizeHosts } from '@/lib/team-summary'
 const teamCreateSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(280).optional().or(z.literal('')),
+  hostIds: z.array(z.string().min(1)).optional(),
 })
 
 function mapTeam(team: any) {
@@ -89,6 +90,17 @@ export async function POST(req: Request) {
 
     const name = parsed.data.name.trim()
     const description = parsed.data.description?.trim() || null
+    const hostIds = Array.from(new Set((parsed.data.hostIds ?? []).filter(Boolean)))
+
+    if (hostIds.length > 0) {
+      const ownedHosts = await prisma.host.findMany({
+        where: { userId, id: { in: hostIds } },
+        select: { id: true },
+      })
+      if (ownedHosts.length !== hostIds.length) {
+        return NextResponse.json({ error: 'One or more hosts do not belong to your account' }, { status: 400 })
+      }
+    }
 
     const existing = await prisma.team.findUnique({
       where: { userId_name: { userId, name } },
@@ -108,8 +120,30 @@ export async function POST(req: Request) {
       },
     })
 
+    if (hostIds.length > 0) {
+      await prisma.teamMember.createMany({
+        data: hostIds.map((hostId) => ({ teamId: team.id, hostId })),
+      })
+    }
+
+    const updated = hostIds.length > 0 ? await prisma.team.findUnique({
+      where: { id: team.id },
+      include: {
+        members: {
+          include: {
+            host: {
+              include: {
+                reports: { orderBy: { reportedAt: 'desc' }, take: 1 },
+                user: { select: { username: true } },
+              },
+            },
+          },
+        },
+      },
+    }) : team
+
     return NextResponse.json({
-      team: {
+      team: hostIds.length > 0 && updated ? mapTeam(updated) : {
         ...team,
         memberCount: 0,
         summary: summarizeHosts([]),
