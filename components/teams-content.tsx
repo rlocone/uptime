@@ -52,6 +52,7 @@ export function TeamsContent() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [selectedHostIds, setSelectedHostIds] = useState<string[]>([])
+  const [appliedHostIds, setAppliedHostIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [editingDescription, setEditingDescription] = useState('')
@@ -112,7 +113,7 @@ export function TeamsContent() {
       const res = await fetch('/api/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName, description: description.trim(), hostIds: selectedHostIds }),
+        body: JSON.stringify({ name: trimmedName, description: description.trim(), hostIds: appliedHostIds }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -120,6 +121,7 @@ export function TeamsContent() {
         setName('')
         setDescription('')
         setSelectedHostIds([])
+        setAppliedHostIds([])
         await loadTeams()
       } else {
         toast.error(data?.error ?? 'Failed to create team')
@@ -186,6 +188,18 @@ export function TeamsContent() {
       { hosts: 0, memberships: 0 }
     )
   }, [teams])
+
+  const hostSelectionDirty =
+    selectedHostIds.length !== appliedHostIds.length || selectedHostIds.some((id) => !appliedHostIds.includes(id))
+
+  const applySelection = () => {
+    setAppliedHostIds(selectedHostIds)
+    toast.success(
+      selectedHostIds.length > 0
+        ? `${selectedHostIds.length} host${selectedHostIds.length === 1 ? '' : 's'} staged for the new team`
+        : 'Cleared staged hosts'
+    )
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 space-y-6">
@@ -257,8 +271,34 @@ export function TeamsContent() {
             <span className="text-xs text-muted-foreground">{selectedHostIds.length} selected</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Select any of your hosts to assign them as soon as the team is created. You can change membership later from the team detail page.
+            Select any of your hosts to stage them for the new team. Click Apply selection before creating so the assignment is explicit.
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={applySelection}
+              disabled={!hostSelectionDirty}
+              className="rounded-md bg-[#39ff14] px-3 py-1.5 text-xs font-semibold text-[#0a0a0f] hover:bg-[#39ff14]/80 disabled:opacity-50"
+            >
+              Apply selection
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedHostIds([])
+                setAppliedHostIds([])
+              }}
+              disabled={selectedHostIds.length === 0 && appliedHostIds.length === 0}
+              className="rounded-md border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted/40 disabled:opacity-50"
+            >
+              Clear selection
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {appliedHostIds.length > 0
+                ? `${appliedHostIds.length} host${appliedHostIds.length === 1 ? '' : 's'} will be added on create`
+                : 'No hosts staged yet'}
+            </span>
+          </div>
           {loadingHosts ? (
             <p className="text-sm text-muted-foreground">Loading your hosts…</p>
           ) : hosts.length === 0 ? (
