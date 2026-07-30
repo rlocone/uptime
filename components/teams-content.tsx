@@ -36,6 +36,7 @@ interface TeamListItem {
   updatedAt: string
   memberCount: number
   summary: TeamSummary
+  hosts?: HostItem[]
 }
 
 function formatPercent(value: number) {
@@ -120,8 +121,6 @@ export function TeamsContent() {
         toast.success('Team created')
         setName('')
         setDescription('')
-        setSelectedHostIds([])
-        setAppliedHostIds([])
         await loadTeams()
       } else {
         toast.error(data?.error ?? 'Failed to create team')
@@ -199,6 +198,11 @@ export function TeamsContent() {
         ? `${selectedHostIds.length} host${selectedHostIds.length === 1 ? '' : 's'} staged for the new team`
         : 'Cleared staged hosts'
     )
+  }
+
+  const removeStagedHost = (hostId: string) => {
+    setSelectedHostIds((current) => current.filter((id) => id !== hostId))
+    setAppliedHostIds((current) => current.filter((id) => id !== hostId))
   }
 
   const stagedHosts = useMemo(() => hosts.filter((host) => appliedHostIds.includes(host.id)), [hosts, appliedHostIds])
@@ -309,6 +313,14 @@ export function TeamsContent() {
                   className="inline-flex items-center gap-2 rounded-full border border-[#39ff14]/30 bg-[#39ff14]/10 px-3 py-1 text-xs font-medium text-[#39ff14]"
                 >
                   {host.hostname}
+                  <button
+                    type="button"
+                    onClick={() => removeStagedHost(host.id)}
+                    className="rounded-full px-1 text-[#39ff14]/80 hover:bg-[#39ff14]/10 hover:text-[#39ff14]"
+                    aria-label={`Remove ${host.hostname} from staged hosts`}
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
             </div>
@@ -457,6 +469,26 @@ export function TeamsContent() {
                           downCount: summary?.downCount ?? 0,
                         }}
                       />
+                      {team.hosts?.length ? (
+                        <div className="space-y-2">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Members</p>
+                          <div className="flex flex-wrap gap-2">
+                            {team.hosts.slice(0, 6).map((host) => (
+                              <span
+                                key={host.id}
+                                className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2.5 py-1 text-[11px] text-foreground"
+                              >
+                                {host.hostname}
+                              </span>
+                            ))}
+                            {team.hosts.length > 6 ? (
+                              <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2.5 py-1 text-[11px] text-muted-foreground">
+                                +{team.hosts.length - 6} more
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
                         <div className="rounded-md border border-border/60 bg-muted/20 p-3">
                           <p className="text-[10px] uppercase tracking-[0.2em]">Current uptime total</p>

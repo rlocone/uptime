@@ -6,41 +6,13 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { generateUniqueTeamSlug, summarizeHosts } from '@/lib/team-summary'
+import { mapTeam } from '@/lib/team-api'
 
 const teamCreateSchema = z.object({
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().max(280).optional().or(z.literal('')),
   hostIds: z.array(z.string().min(1)).optional(),
 })
-
-function mapTeam(team: any) {
-  const hosts = (team.members ?? []).map((member: any) => ({
-    id: member?.host?.id,
-    hostname: member?.host?.hostname,
-    createdAt: member?.host?.createdAt,
-    userId: member?.host?.userId,
-    user: member?.host?.user ? { username: member.host.user.username } : undefined,
-    latestReport: member?.host?.reports?.[0]
-      ? {
-          uptimeSeconds: member.host.reports[0].uptimeSeconds,
-          reportedAt: member.host.reports[0].reportedAt,
-          kernel: member.host.reports[0].kernel,
-          lastPatch: member.host.reports[0].lastPatch,
-        }
-      : null,
-  }))
-
-  return {
-    id: team.id,
-    name: team.name,
-    description: team.description,
-    slug: team.slug,
-    createdAt: team.createdAt,
-    updatedAt: team.updatedAt,
-    memberCount: team.members?.length ?? 0,
-    summary: summarizeHosts(hosts),
-  }
-}
 
 export async function GET() {
   try {
